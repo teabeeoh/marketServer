@@ -3,7 +3,7 @@ import yfinance as yf
 
 app = Flask(__name__)
 
-@app.route('/quotes', methods=['GET'])
+@app.route('/market/quotes', methods=['GET'])
 def get_quotes():
     symbols = request.args.get('symbols')
     if not symbols:
