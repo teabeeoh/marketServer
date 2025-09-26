@@ -2,10 +2,10 @@
 
 IMAGE_NAME="teabeeoh/market_server"
 TAG="latest"
-REGISTRY="docker.fritz.box:5000"
+REGISTRY="harbor.stocksbot.de"
 
 # Image bauen
-docker build --platform linux/amd64 -t ${IMAGE_NAME}:${TAG} .
+docker buildx build --platform linux/amd64,linux/arm64/v8 -t ${IMAGE_NAME}:${TAG} .
 
 # Image taggen
 docker tag ${IMAGE_NAME}:${TAG} ${REGISTRY}/${IMAGE_NAME}:${TAG}
