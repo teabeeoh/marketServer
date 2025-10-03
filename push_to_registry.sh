@@ -3,6 +3,7 @@
 IMAGE_NAME="teabeeoh/market_server"
 TAG="latest"
 REGISTRY="harbor.stocksbot.de"
+#REGISTRY="harbor.fritz.box"
 
 # Image bauen
 docker buildx build --platform linux/amd64,linux/arm64/v8 -t ${IMAGE_NAME}:${TAG} .
