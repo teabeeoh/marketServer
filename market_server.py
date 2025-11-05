@@ -7,7 +7,7 @@ app = Flask(__name__)
 def get_quotes():
     symbols = request.args.get('symbols')
     if not symbols:
-        return jsonify({"error": "Parameter 'symbols' fehlt"}), 400
+        return jsonify({"error": "Parameter 'symbols' missing"}), 400
 
     symbol_list = [s.strip() for s in symbols.split(',')]
     tickers = yf.Tickers(" ".join(symbol_list))
@@ -15,11 +15,11 @@ def get_quotes():
 
     for symbol in symbol_list:
         info = tickers.tickers[symbol].info
-        kurs = info.get("currentPrice")
-        waehrung = info.get("currency")
+        price = info.get("currentPrice")
+        currency = info.get("currency")
         result[symbol] = {
-            "kurs": kurs,
-            "waehrung": waehrung
+            "price": price,
+            "currency": currency
         }
 
     return jsonify(result)
