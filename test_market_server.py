@@ -251,3 +251,163 @@ class TestMarketQuotesEndpoint:
         assert 'price' in data['TEST']
         assert 'currency' in data['TEST']
 
+
+@pytest.mark.integration
+class TestMarketQuotesIntegration:
+    """Integration tests for /market/quotes endpoint with real yfinance calls.
+
+    These tests make actual API calls to Yahoo Finance and may be slower.
+    They can be skipped with: pytest -m "not integration"
+    """
+
+    def test_get_quotes_single_real_symbol(self, client):
+        """Test getting real quotes for a single popular symbol (AAPL)."""
+        response = client.get('/market/quotes?symbols=AAPL')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # Verify structure
+        assert 'AAPL' in data
+        assert 'price' in data['AAPL']
+        assert 'currency' in data['AAPL']
+
+        # Verify data types and reasonable values
+        if data['AAPL']['price'] is not None:
+            assert isinstance(data['AAPL']['price'], (int, float))
+            assert data['AAPL']['price'] > 0  # Stock price should be positive
+
+        if data['AAPL']['currency'] is not None:
+            assert isinstance(data['AAPL']['currency'], str)
+            assert len(data['AAPL']['currency']) > 0
+
+    def test_get_quotes_multiple_real_symbols(self, client):
+        """Test getting real quotes for multiple popular symbols."""
+        response = client.get('/market/quotes?symbols=AAPL,MSFT,GOOGL')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # Verify all requested symbols are in response
+        assert 'AAPL' in data
+        assert 'MSFT' in data
+        assert 'GOOGL' in data
+
+        # Check each symbol has the required fields
+        for symbol in ['AAPL', 'MSFT', 'GOOGL']:
+            assert 'price' in data[symbol]
+            assert 'currency' in data[symbol]
+
+            # If data is available, verify it's reasonable
+            if data[symbol]['price'] is not None:
+                assert isinstance(data[symbol]['price'], (int, float))
+                assert data[symbol]['price'] > 0
+
+    def test_get_quotes_real_etf_symbol(self, client):
+        """Test getting real quotes for an ETF (SPY - S&P 500 ETF)."""
+        response = client.get('/market/quotes?symbols=SPY')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        assert 'SPY' in data
+        assert 'price' in data['SPY']
+        assert 'currency' in data['SPY']
+
+        # SPY should have valid data
+        if data['SPY']['price'] is not None:
+            assert isinstance(data['SPY']['price'], (int, float))
+            assert data['SPY']['price'] > 0
+
+        if data['SPY']['currency'] is not None:
+            assert data['SPY']['currency'] == 'USD'
+
+    def test_get_quotes_real_international_symbols(self, client):
+        """Test getting real quotes for international symbols with different currencies."""
+        # Using well-known international stocks
+        response = client.get('/market/quotes?symbols=NESN.SW,7203.T')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # NESN.SW is Nestlé (Swiss)
+        assert 'NESN.SW' in data
+        assert 'price' in data['NESN.SW']
+        assert 'currency' in data['NESN.SW']
+
+        # 7203.T is Toyota (Japanese)
+        assert '7203.T' in data
+        assert 'price' in data['7203.T']
+        assert 'currency' in data['7203.T']
+
+    def test_get_quotes_real_index_symbols(self, client):
+        """Test getting real quotes for market indices."""
+        response = client.get('/market/quotes?symbols=^GSPC,^DJI')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # ^GSPC is S&P 500 Index
+        assert '^GSPC' in data
+        # ^DJI is Dow Jones Industrial Average
+        assert '^DJI' in data
+
+        for symbol in ['^GSPC', '^DJI']:
+            assert 'price' in data[symbol]
+            assert 'currency' in data[symbol]
+
+            if data[symbol]['price'] is not None:
+                assert isinstance(data[symbol]['price'], (int, float))
+                # Indices should have positive values
+                assert data[symbol]['price'] > 0
+
+    def test_get_quotes_real_invalid_symbol(self, client):
+        """Test getting quotes for an invalid/non-existent symbol."""
+        response = client.get('/market/quotes?symbols=INVALIDTICKER123')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # Should still return a response, but data may be None/null
+        assert 'INVALIDTICKER123' in data
+        assert 'price' in data['INVALIDTICKER123']
+        assert 'currency' in data['INVALIDTICKER123']
+
+    def test_get_quotes_real_mixed_valid_invalid_symbols(self, client):
+        """Test getting quotes with a mix of valid and invalid symbols."""
+        response = client.get('/market/quotes?symbols=AAPL,INVALIDTICKER123,MSFT')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # All symbols should be in response
+        assert 'AAPL' in data
+        assert 'INVALIDTICKER123' in data
+        assert 'MSFT' in data
+
+        # Valid symbols should have data
+        if data['AAPL']['price'] is not None:
+            assert data['AAPL']['price'] > 0
+
+        if data['MSFT']['price'] is not None:
+            assert data['MSFT']['price'] > 0
+
+    def test_get_quotes_real_cryptocurrency(self, client):
+        """Test getting quotes for cryptocurrency symbols."""
+        response = client.get('/market/quotes?symbols=BTC-USD,ETH-USD')
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        assert 'BTC-USD' in data
+        assert 'ETH-USD' in data
+
+        for symbol in ['BTC-USD', 'ETH-USD']:
+            assert 'price' in data[symbol]
+            assert 'currency' in data[symbol]
+
+            if data[symbol]['price'] is not None:
+                assert isinstance(data[symbol]['price'], (int, float))
+                assert data[symbol]['price'] > 0
+
+

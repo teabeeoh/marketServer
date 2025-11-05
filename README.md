@@ -22,25 +22,53 @@ Retrieves stock quotes for the specified ticker symbols.
 ## Development
 
 ### Running Tests
+
+The test suite includes both **unit tests** (with mocked yfinance calls) and **integration tests** (with real API calls).
+
 ```bash
 # Install development dependencies
 pip install -r requirements-dev.txt
 
-# Run all tests
+# Run all tests (unit + integration)
 pytest test_market_server.py -v
+
+# Run only unit tests (fast, no real API calls)
+pytest test_market_server.py -v -m "not integration"
+
+# Run only integration tests (slower, makes real yfinance API calls)
+pytest test_market_server.py -v -m integration
 
 # Run tests with coverage
 pytest test_market_server.py --cov=market_server --cov-report=html
+
+# Run tests with coverage (unit tests only)
+pytest test_market_server.py -m "not integration" --cov=market_server --cov-report=html
 ```
 
-### Test Coverage
-The test suite includes:
+### Test Suite Overview
+
+#### Unit Tests (`TestMarketQuotesEndpoint`)
+Fast tests using mocked yfinance responses:
 - ✅ Missing parameter validation
+- ✅ Empty parameter validation
 - ✅ Single and multiple symbol queries
 - ✅ Handling of whitespace in parameters
-- ✅ Missing data handling
+- ✅ Missing data handling (None values)
 - ✅ Partial data scenarios
 - ✅ Multiple currencies
-- ✅ Error handling
+- ✅ Exception handling
 - ✅ Response format validation
+
+#### Integration Tests (`TestMarketQuotesIntegration`)
+Real API calls to Yahoo Finance (marked with `@pytest.mark.integration`):
+- ✅ Single real symbol (AAPL)
+- ✅ Multiple real symbols (AAPL, MSFT, GOOGL)
+- ✅ Real ETF symbol (SPY)
+- ✅ International symbols with different currencies (Nestlé, Toyota)
+- ✅ Market indices (S&P 500, Dow Jones)
+- ✅ Invalid/non-existent symbols
+- ✅ Mixed valid and invalid symbols
+- ✅ Cryptocurrencies (BTC-USD, ETH-USD)
+
+**Note:** Integration tests require internet connectivity and may be slower due to real API calls. Use `-m "not integration"` during development for faster feedback.
 
