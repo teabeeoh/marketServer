@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
+import pandas as pd
 from market_server import app
 
 
@@ -409,5 +410,267 @@ class TestMarketQuotesIntegration:
             if data[symbol]['price'] is not None:
                 assert isinstance(data[symbol]['price'], (int, float))
                 assert data[symbol]['price'] > 0
+
+
+class TestFinancialsEndpoint:
+    """Test suite for the /market/financials endpoint."""
+
+    def test_get_financials_missing_symbol_parameter(self, client):
+        """Test that the endpoint returns 400 when symbol parameter is missing."""
+        response = client.get('/market/financials')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "Parameter 'symbol' missing"
+
+    def test_get_financials_invalid_format_parameter(self, client):
+        """Test that the endpoint returns 400 for invalid format parameter."""
+        response = client.get('/market/financials?symbol=AAPL&format=xml')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert 'error' in data
+        assert "must be 'json' or 'tsv'" in data['error']
+
+    @patch('financial_data_service.yf.Ticker')
+    def test_get_financials_json_format(self, mock_ticker_class, client):
+        """Test getting financials in JSON format."""
+        # Setup mock
+        mock_ticker = Mock()
+        
+        # Mock income statement
+        mock_income_stmt = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Total Revenue': 400000000000,
+                'Net Income Common Stockholders': 100000000000
+            }
+        })
+        
+        # Mock balance sheet
+        mock_balance_sheet = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Ordinary Shares Number': 15000000000,
+                'Stockholders Equity': 60000000000,
+                'Total Assets': 350000000000,
+                'Goodwill': 0,
+                'Other Intangible Assets': 0
+            }
+        })
+        
+        # Mock cash flow
+        mock_cash_flow = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Free Cash Flow': 95000000000,
+                'Cash Dividends Paid': -15000000000
+            }
+        })
+        
+        mock_ticker.income_stmt = mock_income_stmt
+        mock_ticker.balance_sheet = mock_balance_sheet
+        mock_ticker.cashflow = mock_cash_flow
+        mock_ticker_class.return_value = mock_ticker
+        
+        # Make request
+        response = client.get('/market/financials?symbol=AAPL&format=json')
+        
+        # Assertions
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        data = response.get_json()
+        
+        assert 'symbol' in data
+        assert data['symbol'] == 'AAPL'
+        assert 'years' in data
+        assert 'count' in data
+        assert data['count'] == 1
+        assert len(data['years']) == 1
+        
+        # Check first year data
+        year_data = data['years'][0]
+        assert 'Year' in year_data
+        assert 'Total Revenue (mn)' in year_data
+        assert 'Dividend per Share' in year_data
+
+    @patch('financial_data_service.yf.Ticker')
+    def test_get_financials_tsv_format(self, mock_ticker_class, client):
+        """Test getting financials in TSV format with German number formatting."""
+        # Setup mock
+        mock_ticker = Mock()
+        
+        # Mock income statement
+        mock_income_stmt = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Total Revenue': 400000000000,
+                'Net Income Common Stockholders': 100000000000
+            }
+        })
+        
+        # Mock balance sheet
+        mock_balance_sheet = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Ordinary Shares Number': 15000000000,
+                'Stockholders Equity': 60000000000,
+                'Total Assets': 350000000000,
+                'Goodwill': 0,
+                'Other Intangible Assets': 0
+            }
+        })
+        
+        # Mock cash flow
+        mock_cash_flow = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Free Cash Flow': 95000000000,
+                'Cash Dividends Paid': -15000000000
+            }
+        })
+        
+        mock_ticker.income_stmt = mock_income_stmt
+        mock_ticker.balance_sheet = mock_balance_sheet
+        mock_ticker.cashflow = mock_cash_flow
+        mock_ticker_class.return_value = mock_ticker
+        
+        # Make request
+        response = client.get('/market/financials?symbol=AAPL&format=tsv')
+        
+        # Assertions
+        assert response.status_code == 200
+        assert response.content_type.startswith('text/tab-separated-values')
+        
+        # Check TSV content
+        tsv_data = response.data.decode('utf-8')
+        assert '\t' in tsv_data  # Tab-delimited
+        assert ',' in tsv_data  # German decimal separator
+        assert '.' in tsv_data  # German thousand separator
+        assert 'Year' in tsv_data
+        assert 'Total Revenue (mn)' in tsv_data
+
+    @patch('financial_data_service.yf.Ticker')
+    def test_get_financials_invalid_ticker(self, mock_ticker_class, client):
+        """Test handling of invalid ticker symbol."""
+        # Setup mock to return empty data
+        mock_ticker = Mock()
+        mock_ticker.income_stmt = pd.DataFrame()  # Empty dataframe
+        mock_ticker.balance_sheet = pd.DataFrame()
+        mock_ticker.cashflow = pd.DataFrame()
+        mock_ticker_class.return_value = mock_ticker
+        
+        # Make request
+        response = client.get('/market/financials?symbol=INVALID123')
+        
+        # Assertions
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+
+    @patch('financial_data_service.yf.Ticker')
+    def test_get_financials_default_format(self, mock_ticker_class, client):
+        """Test that default format is JSON when format parameter is omitted."""
+        # Setup mock
+        mock_ticker = Mock()
+        
+        mock_income_stmt = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Total Revenue': 400000000000,
+                'Net Income Common Stockholders': 100000000000
+            }
+        })
+        
+        mock_balance_sheet = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Ordinary Shares Number': 15000000000,
+                'Stockholders Equity': 60000000000,
+                'Total Assets': 350000000000
+            }
+        })
+        
+        mock_cash_flow = pd.DataFrame({
+            pd.Timestamp('2023-12-31'): {
+                'Free Cash Flow': 95000000000,
+                'Cash Dividends Paid': -15000000000
+            }
+        })
+        
+        mock_ticker.income_stmt = mock_income_stmt
+        mock_ticker.balance_sheet = mock_balance_sheet
+        mock_ticker.cashflow = mock_cash_flow
+        mock_ticker_class.return_value = mock_ticker
+        
+        # Make request without format parameter
+        response = client.get('/market/financials?symbol=AAPL')
+        
+        # Assertions
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+
+
+@pytest.mark.integration
+class TestFinancialsIntegration:
+    """Integration tests for /market/financials endpoint with real yfinance calls.
+    
+    These tests make actual API calls to Yahoo Finance and may be slower.
+    They can be skipped with: pytest -m "not integration"
+    """
+
+    def test_get_financials_real_symbol_json(self, client):
+        """Test getting real financial data for AAPL in JSON format."""
+        response = client.get('/market/financials?symbol=AAPL&format=json')
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        
+        # Verify structure
+        assert 'symbol' in data
+        assert data['symbol'] == 'AAPL'
+        assert 'years' in data
+        assert 'count' in data
+        assert data['count'] > 0
+        
+        # Check that we have year data
+        assert len(data['years']) > 0
+        
+        # Check first year has expected fields
+        first_year = data['years'][0]
+        assert 'Year' in first_year
+        assert 'Total Revenue (mn)' in first_year
+        assert 'Net Income Common Stockholders (mn)' in first_year
+        assert 'Free Cash Flow (mn)' in first_year
+        assert 'Dividend per Share' in first_year
+
+    def test_get_financials_real_symbol_tsv(self, client):
+        """Test getting real financial data for MSFT in TSV format."""
+        response = client.get('/market/financials?symbol=MSFT&format=tsv')
+        
+        assert response.status_code == 200
+        assert response.content_type == 'text/tab-separated-values; charset=utf-8'
+        
+        # Check TSV content
+        tsv_data = response.data.decode('utf-8')
+        assert '\t' in tsv_data  # Tab-delimited
+        assert 'Year' in tsv_data
+        assert 'Total Revenue (mn)' in tsv_data
+        
+        # Verify German number formatting (should have dots and commas)
+        lines = tsv_data.strip().split('\n')
+        assert len(lines) > 1  # At least header + one data row
+
+    def test_get_financials_real_invalid_symbol(self, client):
+        """Test getting financials for an invalid symbol."""
+        response = client.get('/market/financials?symbol=INVALIDTICKER999')
+        
+        # Should return 404 for invalid ticker
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+
+    def test_get_financials_real_international_symbol(self, client):
+        """Test getting financials for an international symbol (SAP.DE)."""
+        response = client.get('/market/financials?symbol=SAP.DE&format=json')
+        
+        # Should work for international symbols
+        if response.status_code == 200:
+            data = response.get_json()
+            assert 'symbol' in data
+            assert data['symbol'] == 'SAP.DE'
+            assert 'years' in data
+
 
 
