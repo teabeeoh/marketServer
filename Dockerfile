@@ -7,11 +7,11 @@ LABEL org.label-schema.name="Stock Market Data Server"
 
 WORKDIR /app
 
-COPY src/*.py ./src/
+COPY src/*.py .
 COPY requirements-dev.txt ./
 
 RUN pip install --no-cache-dir flask yfinance gunicorn
 
 EXPOSE 9000
 
-CMD ["gunicorn", "-c", "src/gunicorn.conf.py", "src.wsgi:app"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "wsgi:app"]
