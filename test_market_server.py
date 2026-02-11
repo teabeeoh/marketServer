@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
 import pandas as pd
-from market_server import app
+from src.market_server import app
 
 
 @pytest.fixture
@@ -671,6 +671,8 @@ class TestFinancialsIntegration:
             assert 'symbol' in data
             assert data['symbol'] == 'SAP.DE'
             assert 'years' in data
+
+
 
 
 
