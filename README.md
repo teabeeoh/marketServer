@@ -1,6 +1,6 @@
 # Market-Server
 
-Simple Server that provides some REST endpoints to retrieve stockprices for yahoo ticker symbols.
+Simple Server that provides some REST endpoints to retrieve stockprices for yahoo ticker symbols, as well as AI-powered investment analyses via the Anthropic Claude API.
 
 ## API Endpoints
 
@@ -71,6 +71,49 @@ curl "http://localhost:5000/market/financials?symbol=AAPL&format=tsv" > aapl_fin
 
 ````
 
+### GET /market/analysis
+
+Generates an AI-powered investment analysis for a given company using the Anthropic Claude API. The response is Markdown-formatted text suitable for direct rendering.
+
+**Prerequisites:** The environment variable `ANTHROPIC_API_KEY` must be set.
+
+**Parameters:**
+
+- `company` (required): Company identifier — ticker symbol, company name, ISIN, or any other recognizable identifier (e.g., `AAPL`, `Apple Inc`, `US0378331005`)
+
+**Response:**
+
+Markdown text (`text/markdown; charset=utf-8`) containing a structured investment analysis, typically covering business overview, financial highlights, strengths and risks, and an investment verdict.
+
+**Error responses:**
+
+| Status | Reason |
+|--------|--------|
+| 400 | `company` parameter missing |
+| 503 | `ANTHROPIC_API_KEY` not set |
+| 502 | Anthropic API error |
+| 500 | Unexpected server error |
+
+**Usage Examples:**
+
+```bash
+# Analyse by ticker symbol
+curl "http://localhost:5000/market/analysis?company=AAPL"
+
+# Analyse by company name
+curl "http://localhost:5000/market/analysis?company=SAP+SE"
+
+# Analyse by ISIN
+curl "http://localhost:5000/market/analysis?company=US0378331005"
+
+# Save result as Markdown file
+curl "http://localhost:5000/market/analysis?company=AAPL" > aapl_analysis.md
+```
+
+**Note:** This endpoint calls the Claude API and may take several seconds to complete. For GUI integrations, a streaming variant (`/market/analysis/stream`) using Server-Sent Events (SSE) is preferable to avoid long blocking waits — see the architecture notes in `CLAUDE.md`.
+
+---
+
 ## Development
 
 ### Running Tests
@@ -125,6 +168,25 @@ Real API calls to Yahoo Finance (marked with `@pytest.mark.integration`):
 - ✅ Invalid/non-existent symbols
 - ✅ Mixed valid and invalid symbols
 - ✅ Cryptocurrencies (BTC-USD, ETH-USD)
+
+#### Unit Tests (`TestAnalysisEndpoint`)
+
+Fast tests using a mocked Anthropic client (no real API calls, no `ANTHROPIC_API_KEY` required):
+
+- ✅ Missing parameter validation
+- ✅ Correct `text/markdown` content type
+- ✅ Company identifier forwarded to Claude
+- ✅ Whitespace stripping
+- ✅ Missing API key → 503
+- ✅ Anthropic API error → 502
+- ✅ Multiple content blocks (non-text blocks ignored)
+
+#### Integration Tests (`TestAnalysisIntegration`)
+
+Real API calls to Anthropic Claude (require `ANTHROPIC_API_KEY` and incur API costs):
+
+- ✅ Ticker symbol input (AAPL)
+- ✅ Full company name input (Apple Inc)
 
 **Note:** Integration tests require internet connectivity and may be slower due to real API calls. Use `-m "not integration"` during development for faster feedback.
 

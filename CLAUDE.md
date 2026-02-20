@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Python 3.11 Flask REST API server for financial market data, fetching stock quotes and financial statements from Yahoo Finance via the `yfinance` library. Deployed with Gunicorn in Docker, served on port 9000.
+Python 3.11 Flask REST API server for financial market data, fetching stock quotes and financial statements from Yahoo Finance via the `yfinance` library, and AI-powered investment analyses via the Anthropic Claude API. Deployed with Gunicorn in Docker, served on port 9000.
 
 ## Commands
 
@@ -23,7 +23,7 @@ docker run -p 9000:9000 marketserver:latest
 
 ### Install Dependencies
 ```bash
-pip install flask yfinance gunicorn
+pip install flask yfinance gunicorn anthropic
 pip install -r requirements-dev.txt  # adds pytest, pytest-cov, openpyxl
 ```
 
@@ -48,11 +48,16 @@ python src/fill_excel_template.py SAP.DE output.xlsx
 1. **API Layer** (`src/market_server.py`) — Flask routes:
    - `GET /market/quotes?symbols=AAPL,MSFT` — stock price quotes (JSON)
    - `GET /market/financials?symbol=AAPL&format=tsv` — financial statements (JSON or TSV)
+   - `GET /market/analysis?company=AAPL` — AI investment analysis (Markdown); accepts name, ticker, ISIN, etc.
 
 2. **Service Layer** (`src/financial_data_service.py`) — data fetching and processing:
    - Fetches income statement, balance sheet, cash flow via `yf.Ticker()`
    - Converts amounts to millions, calculates derived metrics
    - Supports JSON and TSV export with German number formatting (dot thousands, comma decimals)
+
+   `src/analysis_service.py` — Anthropic Claude integration:
+   - Reads `ANTHROPIC_API_KEY` from environment
+   - Uses `claude-sonnet-4-6`, returns Markdown
 
 3. **Utility** (`src/fill_excel_template.py`) — standalone script that fills `resources/excel_template.xlsx` with financial data (copies template, never modifies original)
 

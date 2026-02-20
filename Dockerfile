@@ -10,7 +10,7 @@ WORKDIR /app
 COPY src/*.py .
 COPY requirements-dev.txt ./
 
-RUN pip install --no-cache-dir flask yfinance gunicorn
+RUN pip install --no-cache-dir flask yfinance gunicorn anthropic
 
 EXPOSE 9000
 

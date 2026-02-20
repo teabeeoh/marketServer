@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, Response
 import yfinance as yf
+import anthropic
 from financial_data_service import fetch_financial_data, export_to_tsv, export_to_json
+from analysis_service import get_investment_analysis
 
 app = Flask(__name__)
 
@@ -82,3 +84,28 @@ def get_financials():
         # Handle unexpected errors
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
+
+@app.route('/market/analysis', methods=['GET'])
+def get_analysis():
+    """
+    Generate an AI-powered investment analysis for a company.
+
+    Query Parameters:
+        company (required): Company identifier — name, ticker symbol, ISIN, or similar.
+
+    Returns:
+        Markdown-formatted investment analysis (text/markdown).
+    """
+    company = request.args.get('company')
+    if not company:
+        return jsonify({"error": "Parameter 'company' missing"}), 400
+
+    try:
+        markdown = get_investment_analysis(company.strip())
+        return Response(markdown, mimetype='text/markdown; charset=utf-8')
+    except EnvironmentError as e:
+        return jsonify({"error": str(e)}), 503
+    except anthropic.APIError as e:
+        return jsonify({"error": f"Anthropic API error: {str(e)}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500

@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 import pandas as pd
+import anthropic
 from src.market_server import app
 
 
@@ -600,6 +601,166 @@ class TestFinancialsEndpoint:
         # Assertions
         assert response.status_code == 200
         assert response.content_type == 'application/json'
+
+
+class TestAnalysisEndpoint:
+    """Test suite for the /market/analysis endpoint."""
+
+    def test_get_analysis_missing_company_parameter(self, client):
+        """Test that the endpoint returns 400 when company parameter is missing."""
+        response = client.get('/market/analysis')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "Parameter 'company' missing"
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_returns_markdown(self, mock_build_client, client):
+        """Test that the endpoint returns Markdown content for a valid company."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Investment Analysis\n\nThis is a test analysis.'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        response = client.get('/market/analysis?company=AAPL')
+
+        assert response.status_code == 200
+        assert 'text/markdown' in response.content_type
+        body = response.data.decode('utf-8')
+        assert '# Investment Analysis' in body
+        assert 'test analysis' in body
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_passes_company_to_claude(self, mock_build_client, client):
+        """Test that the company parameter is forwarded to the Claude API."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Analysis'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        client.get('/market/analysis?company=SAP')
+
+        call_kwargs = mock_client.messages.create.call_args
+        messages = call_kwargs.kwargs.get('messages') or call_kwargs.args[0]
+        user_content = next(
+            m['content'] for m in (call_kwargs.kwargs.get('messages') or [])
+            if m['role'] == 'user'
+        )
+        assert 'SAP' in user_content
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_strips_whitespace_from_company(self, mock_build_client, client):
+        """Test that leading/trailing whitespace is stripped from the company parameter."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = 'Analysis result'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        response = client.get('/market/analysis?company=+AAPL+')
+        assert response.status_code == 200
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_missing_api_key(self, mock_build_client, client):
+        """Test that a missing API key results in a 503 response."""
+        mock_build_client.side_effect = EnvironmentError(
+            "ANTHROPIC_API_KEY environment variable is not set."
+        )
+
+        response = client.get('/market/analysis?company=AAPL')
+
+        assert response.status_code == 503
+        data = response.get_json()
+        assert 'error' in data
+        assert 'ANTHROPIC_API_KEY' in data['error']
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_anthropic_api_error(self, mock_build_client, client):
+        """Test that an Anthropic API error results in a 502 response."""
+        mock_client = Mock()
+        mock_client.messages.create.side_effect = anthropic.APIStatusError(
+            message="Service unavailable",
+            response=Mock(status_code=503, headers={}),
+            body={},
+        )
+        mock_build_client.return_value = mock_client
+
+        response = client.get('/market/analysis?company=AAPL')
+
+        assert response.status_code == 502
+        data = response.get_json()
+        assert 'error' in data
+        assert 'Anthropic API error' in data['error']
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_multiple_text_blocks(self, mock_build_client, client):
+        """Test that multiple text blocks in the response are joined correctly."""
+        mock_block1 = Mock()
+        mock_block1.type = 'text'
+        mock_block1.text = 'Part one'
+
+        mock_block2 = Mock()
+        mock_block2.type = 'tool_use'  # Non-text block, should be ignored
+
+        mock_block3 = Mock()
+        mock_block3.type = 'text'
+        mock_block3.text = 'Part two'
+
+        mock_message = Mock()
+        mock_message.content = [mock_block1, mock_block2, mock_block3]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        response = client.get('/market/analysis?company=AAPL')
+
+        assert response.status_code == 200
+        body = response.data.decode('utf-8')
+        assert 'Part one' in body
+        assert 'Part two' in body
+        assert 'tool_use' not in body
+
+
+@pytest.mark.integration
+class TestAnalysisIntegration:
+    """Integration tests for /market/analysis endpoint with real Anthropic API calls.
+
+    These tests require ANTHROPIC_API_KEY to be set and will incur API costs.
+    They can be skipped with: pytest -m "not integration"
+    """
+
+    def test_get_analysis_real_ticker(self, client):
+        """Test getting a real investment analysis for AAPL."""
+        response = client.get('/market/analysis?company=AAPL')
+
+        assert response.status_code == 200
+        assert 'text/markdown' in response.content_type
+        body = response.data.decode('utf-8')
+        assert len(body) > 100  # Should contain meaningful content
+        assert '#' in body  # Should contain Markdown headings
+
+    def test_get_analysis_real_company_name(self, client):
+        """Test getting a real investment analysis using a full company name."""
+        response = client.get('/market/analysis?company=Apple+Inc')
+
+        assert response.status_code == 200
+        body = response.data.decode('utf-8')
+        assert len(body) > 100
 
 
 @pytest.mark.integration
