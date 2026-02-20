@@ -13,7 +13,6 @@ DEFAULT_MAX_TOKENS = 2048
 
 def build_client() -> anthropic.Anthropic:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    print(api_key)
     client = anthropic.Client(api_key=api_key)
     return client
     if not api_key:
@@ -36,6 +35,7 @@ def get_investment_analysis(company: str) -> str:
         anthropic.APIError: If the Anthropic API call fails.
     """
     client = build_client()
+    print(f"Preparing anylsis for company {company}")
     message = client.messages.create(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
@@ -47,6 +47,7 @@ def get_investment_analysis(company: str) -> str:
             }
         ],
     )
+    print(f"Analyis done!")
     return "\n".join(
         block.text for block in message.content if block.type == "text"
     )
