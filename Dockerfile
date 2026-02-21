@@ -5,6 +5,8 @@ LABEL org.label-schema.schema-version="1.0"
 LABEL maintainer="Thomas Bolz <thomas.bolz@gmail.com>"
 LABEL org.label-schema.name="Stock Market Data Server"
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 COPY src/*.py .

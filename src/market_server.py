@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify, Response
 import yfinance as yf
 import anthropic
@@ -5,6 +6,9 @@ from financial_data_service import fetch_financial_data, export_to_tsv, export_t
 from analysis_service import get_investment_analysis
 
 app = Flask(__name__)
+
+if not os.environ.get("ANTHROPIC_API_KEY"):
+    print("WARNING: ANTHROPIC_API_KEY is not set — AI features will not work.")
 
 @app.route('/market/quotes', methods=['GET'])
 def get_quotes():

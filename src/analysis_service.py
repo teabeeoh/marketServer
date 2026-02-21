@@ -13,8 +13,6 @@ DEFAULT_MAX_TOKENS = 2048
 
 def build_client() -> anthropic.Anthropic:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    client = anthropic.Client(api_key=api_key)
-    return client
     if not api_key:
         raise EnvironmentError("ANTHROPIC_API_KEY environment variable is not set.")
     return anthropic.Anthropic(api_key=api_key)
