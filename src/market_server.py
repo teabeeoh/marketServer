@@ -9,6 +9,12 @@ app = Flask(__name__)
 
 if not os.environ.get("ANTHROPIC_API_KEY"):
     print("WARNING: ANTHROPIC_API_KEY is not set — AI features will not work.")
+else:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if "heX" in api_key:
+        print("Using personal API key")
+    else:
+        print("Using CTSH API key")
 
 @app.route('/market/quotes', methods=['GET'])
 def get_quotes():
