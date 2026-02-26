@@ -14,7 +14,7 @@ else:
     if "heX" in api_key:
         print("Using personal API key")
     else:
-        print("Using CTSH API key")
+        print(f"Using CTSH API key ${api_key[:2]}...${api_key[-2:]}")
 
 @app.route('/market/quotes', methods=['GET'])
 def get_quotes():
@@ -95,23 +95,41 @@ def get_financials():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
-@app.route('/market/analysis', methods=['GET'])
+@app.route('/market/analysis', methods=['GET', 'POST'])
 def get_analysis():
     """
     Generate an AI-powered investment analysis for a company.
 
-    Query Parameters:
+    Query Parameters (GET or POST form fields):
         company (required): Company identifier — name, ticker symbol, ISIN, or similar.
+        context (optional): Analyst background / expectations appended to the system prompt.
+
+    POST multipart/form-data:
+        files (optional): One or more documents (PDF, plain text) attached for Claude to read.
 
     Returns:
         Markdown-formatted investment analysis (text/markdown).
     """
-    company = request.args.get('company')
+    # Support both query params (GET) and form fields (POST)
+    company = request.values.get('company')
     if not company:
         return jsonify({"error": "Parameter 'company' missing"}), 400
 
+    context = request.values.get('context') or None
+
+    # Collect uploaded files as (filename, bytes, media_type) tuples
+    files = None
+    if request.files:
+        files = []
+        for uploaded_file in request.files.getlist('files'):
+            if uploaded_file.filename:
+                media_type = uploaded_file.mimetype or 'application/octet-stream'
+                files.append((uploaded_file.filename, uploaded_file.read(), media_type))
+        if not files:
+            files = None
+
     try:
-        markdown = get_investment_analysis(company.strip())
+        markdown = get_investment_analysis(company.strip(), context=context, files=files)
         return Response(markdown, mimetype='text/markdown; charset=utf-8')
     except EnvironmentError as e:
         return jsonify({"error": str(e)}), 503

@@ -651,12 +651,120 @@ class TestAnalysisEndpoint:
         client.get('/market/analysis?company=SAP')
 
         call_kwargs = mock_client.messages.create.call_args
-        messages = call_kwargs.kwargs.get('messages') or call_kwargs.args[0]
         user_content = next(
             m['content'] for m in (call_kwargs.kwargs.get('messages') or [])
             if m['role'] == 'user'
         )
-        assert 'SAP' in user_content
+        # content is a list of blocks; find the text block
+        text_block = next(b for b in user_content if b['type'] == 'text')
+        assert 'SAP' in text_block['text']
+
+    @patch('analysis_service.build_client')
+    def test_get_analysis_with_context(self, mock_build_client, client):
+        """Test that the context query param is appended to the system prompt."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Analysis'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        client.get('/market/analysis?company=AAPL&context=Focus+on+ESG+risks')
+
+        call_kwargs = mock_client.messages.create.call_args
+        system = call_kwargs.kwargs.get('system', '')
+        assert 'Focus on ESG risks' in system
+
+    @patch('analysis_service.build_client')
+    def test_post_analysis_with_company_form_field(self, mock_build_client, client):
+        """Test that POST with company as a form field works."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Analysis'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        response = client.post('/market/analysis', data={'company': 'MSFT'})
+        assert response.status_code == 200
+        assert 'text/markdown' in response.content_type
+
+    def test_post_analysis_missing_company_returns_400(self, client):
+        """Test that POST without company field returns 400."""
+        response = client.post('/market/analysis', data={})
+        assert response.status_code == 400
+        assert response.get_json()['error'] == "Parameter 'company' missing"
+
+    @patch('analysis_service.build_client')
+    def test_post_analysis_with_context_form_field(self, mock_build_client, client):
+        """Test that POST context form field is forwarded to the system prompt."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Analysis'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        client.post('/market/analysis', data={'company': 'AAPL', 'context': 'Long-term horizon'})
+
+        call_kwargs = mock_client.messages.create.call_args
+        system = call_kwargs.kwargs.get('system', '')
+        assert 'Long-term horizon' in system
+
+    @patch('analysis_service.build_client')
+    def test_post_analysis_with_file_upload(self, mock_build_client, client):
+        """Test that uploaded files appear as document blocks before the text block."""
+        mock_message = Mock()
+        mock_block = Mock()
+        mock_block.type = 'text'
+        mock_block.text = '# Analysis'
+        mock_message.content = [mock_block]
+
+        mock_client = Mock()
+        mock_client.messages.create.return_value = mock_message
+        mock_build_client.return_value = mock_client
+
+        pdf_bytes = b'%PDF-1.4 fake pdf content'
+        response = client.post(
+            '/market/analysis',
+            data={'company': 'AAPL'},
+            content_type='multipart/form-data',
+        )
+        # Baseline: no file → single text block
+        call_kwargs = mock_client.messages.create.call_args
+        user_content = next(
+            m['content'] for m in call_kwargs.kwargs.get('messages', [])
+            if m['role'] == 'user'
+        )
+        assert user_content[0]['type'] == 'text'
+
+        # Now send with a file
+        from io import BytesIO
+        response = client.post(
+            '/market/analysis',
+            data={'company': 'AAPL', 'files': (BytesIO(pdf_bytes), 'report.pdf')},
+            content_type='multipart/form-data',
+        )
+        assert response.status_code == 200
+        call_kwargs = mock_client.messages.create.call_args
+        user_content = next(
+            m['content'] for m in call_kwargs.kwargs.get('messages', [])
+            if m['role'] == 'user'
+        )
+        # Document block should come first, text block last
+        assert user_content[0]['type'] == 'document'
+        assert user_content[0]['title'] == 'report.pdf'
+        assert user_content[-1]['type'] == 'text'
+        assert 'AAPL' in user_content[-1]['text']
 
     @patch('analysis_service.build_client')
     def test_get_analysis_strips_whitespace_from_company(self, mock_build_client, client):
