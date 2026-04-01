@@ -48,7 +48,8 @@ python src/fill_excel_template.py SAP.DE output.xlsx
 1. **API Layer** (`src/market_server.py`) — Flask routes:
    - `GET /market/quotes?symbols=AAPL,MSFT` — stock price quotes (JSON)
    - `GET /market/financials?symbol=AAPL&format=tsv` — financial statements (JSON or TSV)
-   - `GET /market/analysis?company=AAPL` — AI investment analysis (Markdown); accepts name, ticker, ISIN, etc.
+   - `GET /market/analysis?company=AAPL[&context=...]` — AI investment analysis (Markdown); accepts name, ticker, ISIN, etc.
+   - `POST /market/analysis` — same as GET but also accepts `multipart/form-data` with `files` field (PDF/text documents attached as Claude document blocks)
 
 2. **Service Layer** (`src/financial_data_service.py`) — data fetching and processing:
    - Fetches income statement, balance sheet, cash flow via `yf.Ticker()`
@@ -58,6 +59,7 @@ python src/fill_excel_template.py SAP.DE output.xlsx
    `src/analysis_service.py` — Anthropic Claude integration:
    - Reads `ANTHROPIC_API_KEY` from environment
    - Uses `claude-sonnet-4-6`, returns Markdown
+   - Optional `context` string appended to system prompt; optional `files` list of `(filename, bytes, media_type)` attached as document blocks before the user message
 
 3. **Utility** (`src/fill_excel_template.py`) — standalone script that fills `resources/excel_template.xlsx` with financial data (copies template, never modifies original)
 
