@@ -1,0 +1,56 @@
+### Market Server – Beispielaufrufe
+### Voraussetzung: Server läuft auf Port 9000 (Gunicorn Run Configuration)
+
+@host = http://localhost:9000
+
+# ─────────────────────────────────────────────
+# /market/quotes – Aktienkurse
+# ─────────────────────────────────────────────
+
+### Einzelner Titel
+GET {{host}}/market/quotes?symbols=AAPL
+
+### Mehrere Titel (inkl. internationaler Symbole)
+GET {{host}}/market/quotes?symbols=ALV.DE,NESN.SW,CRM
+
+# ─────────────────────────────────────────────
+# /market/financials – Finanzdaten
+# ─────────────────────────────────────────────
+
+### JSON-Format
+GET {{host}}/market/financials?symbol=AAPL
+
+### TSV-Format (Excel-kompatibel, deutsche Zahlenformatierung)
+GET {{host}}/market/financials?symbol=SAP.DE&format=tsv
+
+### Internationaler Titel
+GET {{host}}/market/financials?symbol=NESN.SW&format=json
+
+# ─────────────────────────────────────────────
+# /market/excel – Analyse-Excel herunterladen
+# ─────────────────────────────────────────────
+
+### US-Titel
+GET {{host}}/market/excel?symbol=AAPL
+
+### Deutscher Titel
+GET {{host}}/market/excel?symbol=ALV.DE
+
+### Schweizer Titel
+GET {{host}}/market/excel?symbol=NESN.SW
+
+# ─────────────────────────────────────────────
+# /market/analysis – KI-Investmentanalyse
+# ─────────────────────────────────────────────
+
+### Analyse per Ticker-Symbol
+GET {{host}}/market/analysis?company=AAPL
+
+### Analyse per Unternehmensname
+GET {{host}}/market/analysis?company=Allianz+SE
+
+### Analyse per ISIN
+GET {{host}}/market/analysis?company=DE0008404005
+
+### Analyse mit Kontext (Erwartungen / Hintergrund)
+GET {{host}}/market/analysis?company=SAP.DE&context=Fokus+auf+Cloud-Transformation+und+Margenpotenzial
