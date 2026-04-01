@@ -29,10 +29,10 @@ pip install -r requirements-dev.txt  # adds pytest, pytest-cov, openpyxl
 
 ### Run Tests
 ```bash
-pytest test_market_server.py -v -m "not integration"  # unit tests only (fast, mocked)
-pytest test_market_server.py -v -m integration          # integration tests (real API calls)
-pytest test_market_server.py -v                          # all tests
-pytest test_market_server.py --cov=src --cov-report=html # with coverage
+pytest tests/ -v -m "not integration"  # unit tests only (fast, mocked)
+pytest tests/ -v -m integration          # integration tests (real API calls)
+pytest tests/ -v                          # all tests
+pytest tests/ --cov=src --cov-report=html # with coverage
 ```
 
 ### Excel Template Filler
@@ -76,4 +76,4 @@ Whenever a new endpoint is added or an existing one is changed, examples must be
 - **German localization**: Numbers formatted as `1.234.567,89` in TSV output
 - **Flexible yfinance field mapping**: Tries multiple field name variants to handle API inconsistencies
 - **Test isolation**: Unit tests mock yfinance entirely; integration tests (marked `@pytest.mark.integration`) make real API calls
-- **pytest markers** configured in `src/pytest.ini`
+- **pytest markers** configured in `pytest.ini` (project root)
