@@ -175,6 +175,26 @@ def fetch_financial_data(ticker_symbol: str) -> pd.DataFrame:
     return df
 
 
+def fetch_company_info(ticker_symbol: str) -> dict:
+    """
+    Fetch company metadata for a given ticker symbol from Yahoo Finance.
+
+    Args:
+        ticker_symbol: The Yahoo Finance ticker symbol (e.g., 'AAPL', 'SAP.DE')
+
+    Returns:
+        Dictionary with keys: name, sector, currency, current_price
+    """
+    ticker = yf.Ticker(ticker_symbol)
+    info = ticker.info
+    return {
+        'name': info.get('longName') or ticker_symbol,
+        'sector': info.get('sector') or '',
+        'currency': info.get('currency') or '',
+        'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+    }
+
+
 def export_to_tsv(df: pd.DataFrame) -> str:
     """
     Export DataFrame to German Excel format (tab-delimited, comma decimal separator).

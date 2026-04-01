@@ -1,9 +1,18 @@
 import os
-from flask import Flask, request, jsonify, Response
+import sys
+import tempfile
+from pathlib import Path
+from flask import Flask, request, jsonify, Response, send_file
 import yfinance as yf
 import anthropic
 from financial_data_service import fetch_financial_data, export_to_tsv, export_to_json
 from analysis_service import get_investment_analysis
+
+# Add src directory to path so fill_excel_template can import financial_data_service
+sys.path.insert(0, str(Path(__file__).parent))
+from fill_excel_template import fill_excel_template
+
+TEMPLATE_PATH = Path(__file__).parent.parent / 'resources' / 'excel_template.xlsx'
 
 app = Flask(__name__)
 
@@ -137,3 +146,42 @@ def get_analysis():
         return jsonify({"error": f"Anthropic API error: {str(e)}"}), 502
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+
+@app.route('/market/excel', methods=['GET'])
+def get_excel():
+    """
+    Generate a filled Excel analysis file for a ticker symbol.
+
+    Query Parameters:
+        symbol (required): Yahoo Finance ticker symbol (e.g., AAPL, ALV.DE, NESN.SW)
+
+    Returns:
+        Excel file (.xlsx) with financial data for the last 5 years plus DCF assumptions.
+    """
+    symbol = request.args.get('symbol')
+    if not symbol:
+        return jsonify({"error": "Parameter 'symbol' missing"}), 400
+
+    symbol = symbol.strip()
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+
+        fill_excel_template(symbol, TEMPLATE_PATH, tmp_path)
+
+        safe_name = symbol.replace('.', '_')
+        return send_file(
+            tmp_path,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f"{safe_name}_analyse.xlsx"
+        )
+    except (ValueError, FileNotFoundError) as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+    finally:
+        if tmp_path and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)

@@ -15,11 +15,12 @@ Example:
 
 import sys
 import argparse
+from datetime import date
 import pandas as pd
 from pathlib import Path
 from copy import copy
 from openpyxl import load_workbook
-from financial_data_service import fetch_financial_data
+from financial_data_service import fetch_financial_data, fetch_company_info
 
 
 def fill_excel_template(ticker_symbol: str, template_path: Path, output_path: Path):
@@ -32,31 +33,29 @@ def fill_excel_template(ticker_symbol: str, template_path: Path, output_path: Pa
         ticker_symbol: Yahoo Finance ticker symbol (e.g., 'AAPL', 'SAP.DE')
         template_path: Path to the Excel template file (read-only)
         output_path: Path where the filled Excel file will be saved
+
+    Raises:
+        ValueError: If ticker is invalid or data cannot be fetched
+        FileNotFoundError: If the template file does not exist
     """
     print(f"Fetching financial data for {ticker_symbol}...")
 
-    # Fetch financial data using existing service
-    try:
-        df = fetch_financial_data(ticker_symbol)
-    except ValueError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    df = fetch_financial_data(ticker_symbol)
+    company_info = fetch_company_info(ticker_symbol)
+
+    # TODO: Check if removing this results in more data or has any effect?
+    # Limit to last 5 years
+    df = df.head(5)
 
     print(f"Retrieved data for {len(df)} years")
 
     # Ensure we never overwrite the template
     if output_path.resolve() == template_path.resolve():
-        print(f"Error: Output path cannot be the same as template path!")
-        print(f"Template must remain unchanged: {template_path}")
-        sys.exit(1)
+        raise ValueError(f"Output path cannot be the same as template path: {template_path}")
 
     # Load the Excel template (READ-ONLY - will never be modified)
     print(f"Loading template from {template_path}...")
-    try:
-        template_workbook = load_workbook(template_path)
-    except FileNotFoundError:
-        print(f"Error: Template file not found at {template_path}")
-        sys.exit(1)
+    template_workbook = load_workbook(template_path)
 
     # Get the first (template) sheet
     template_sheet = template_workbook.active
@@ -108,10 +107,16 @@ def fill_excel_template(ticker_symbol: str, template_path: Path, output_path: Pa
     # - Row 1-4: Metadata (Name, ISIN, Sektor, Währung, Dashboard)
     # - Row 5: Headers (Jahr, Umsatz, J, FCF, Dividende, etc.)
     # - Row 6+: Data rows
+    # - Row 22: DCF assumptions (CAGR, avg margin, current price)
 
+    # --- Header section (row 2) ---
+    output_sheet['A2'] = company_info['name']
+    output_sheet['C2'] = company_info['sector']
+    output_sheet['D2'] = company_info['currency']
+    output_sheet['L2'] = date.today().strftime('%d.%m.%Y')
+
+    # --- Data rows (row 6+) ---
     # Column mapping based on template structure (Row 5 headers)
-    # Jahr, Umsatz (Mio), J (Mio), FCF (Mio), Dividende, Anzahl Aktien,
-    # Eigenkapital, Bilanzsumme, Goodwill, Intangible Assets
     column_mapping = {
         'Year': 'A',
         'Total Revenue (mn)': 'B',
@@ -125,18 +130,46 @@ def fill_excel_template(ticker_symbol: str, template_path: Path, output_path: Pa
         'Other Intangible Assets (mn)': 'J'
     }
 
-    # Write data starting from row 6 (after headers in row 5)
     start_row = 6
     for row_idx, (_, row_data) in enumerate(df.iterrows(), start=start_row):
         for col_name, excel_col in column_mapping.items():
             cell = f"{excel_col}{row_idx}"
             value = row_data[col_name]
 
+            if col_name == 'Year' and isinstance(value, str) and len(value) == 10:
+                # Reformat YYYY-MM-DD → DD.MM.YYYY
+                try:
+                    value = f"{value[8:10]}.{value[5:7]}.{value[0:4]}"
+                except Exception:
+                    pass
+
             # Handle None/NaN values
             if value is None or (isinstance(value, float) and pd.isna(value)):
                 output_sheet[cell] = ""
             else:
                 output_sheet[cell] = value
+
+    # --- DCF assumptions (row 22) ---
+    revenues = [r for r in df['Total Revenue (mn)'] if r is not None and not (isinstance(r, float) and pd.isna(r))]
+    if len(revenues) >= 2:
+        n = len(revenues)
+        cagr = (revenues[0] / revenues[n - 1]) ** (1 / (n - 1)) - 1
+        output_sheet['C22'] = cagr
+
+    margins = []
+    for _, row in df.iterrows():
+        rev = row['Total Revenue (mn)']
+        ni = row['Net Income Common Stockholders (mn)']
+        if (rev is not None and ni is not None and
+                not (isinstance(rev, float) and pd.isna(rev)) and
+                not (isinstance(ni, float) and pd.isna(ni)) and
+                rev != 0):
+            margins.append(ni / rev)
+    if margins:
+        output_sheet['E22'] = sum(margins) / len(margins)
+
+    if company_info.get('current_price') is not None:
+        output_sheet['F22'] = company_info['current_price']
 
     # Save the NEW workbook (template remains untouched)
     print(f"Saving workbook to {output_path}...")
@@ -191,7 +224,11 @@ Examples:
         output_path = (cwd / f"out/{safe_ticker}.xlsx").resolve()
 
     # Fill the template
-    fill_excel_template(args.ticker, template_path, output_path)
+    try:
+        fill_excel_template(args.ticker, template_path, output_path)
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

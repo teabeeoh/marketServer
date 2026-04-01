@@ -933,13 +933,141 @@ class TestFinancialsIntegration:
     def test_get_financials_real_international_symbol(self, client):
         """Test getting financials for an international symbol (SAP.DE)."""
         response = client.get('/market/financials?symbol=SAP.DE&format=json')
-        
+
         # Should work for international symbols
         if response.status_code == 200:
             data = response.get_json()
             assert 'symbol' in data
             assert data['symbol'] == 'SAP.DE'
             assert 'years' in data
+
+
+class TestExcelEndpoint:
+    """Test suite for the /market/excel endpoint."""
+
+    def test_get_excel_missing_symbol_parameter(self, client):
+        """Test that the endpoint returns 400 when symbol parameter is missing."""
+        response = client.get('/market/excel')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "Parameter 'symbol' missing"
+
+    @patch('fill_excel_template.fetch_company_info')
+    @patch('fill_excel_template.fetch_financial_data')
+    def test_get_excel_returns_xlsx_file(self, mock_fetch_data, mock_fetch_info, client):
+        """Test that the endpoint returns an Excel file for a valid symbol."""
+        mock_fetch_data.return_value = pd.DataFrame({
+            'Year': ['2023-12-31', '2022-12-31'],
+            'Total Revenue (mn)': [400000.0, 380000.0],
+            'Net Income Common Stockholders (mn)': [100000.0, 95000.0],
+            'Free Cash Flow (mn)': [90000.0, 85000.0],
+            'Dividend per Share': [0.96, 0.90],
+            'Ordinary Shares Number (mn)': [15000.0, 15500.0],
+            'Stockholders Equity (mn)': [62000.0, 58000.0],
+            'Total Assets (mn)': [350000.0, 340000.0],
+            'Goodwill (mn)': [0.0, 0.0],
+            'Other Intangible Assets (mn)': [0.0, 0.0],
+        })
+        mock_fetch_info.return_value = {
+            'name': 'Apple Inc.',
+            'sector': 'Technology',
+            'currency': 'USD',
+            'current_price': 175.0,
+        }
+
+        response = client.get('/market/excel?symbol=AAPL')
+
+        assert response.status_code == 200
+        assert response.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        assert b'AAPL' in response.headers.get('Content-Disposition', '').encode()
+        assert len(response.data) > 0
+
+    @patch('fill_excel_template.fetch_company_info')
+    @patch('fill_excel_template.fetch_financial_data')
+    def test_get_excel_invalid_ticker_returns_404(self, mock_fetch_data, mock_fetch_info, client):
+        """Test that the endpoint returns 404 for an invalid ticker."""
+        mock_fetch_data.side_effect = ValueError("No financial data available for ticker: INVALID999")
+
+        response = client.get('/market/excel?symbol=INVALID999')
+
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+
+    @patch('fill_excel_template.fetch_company_info')
+    @patch('fill_excel_template.fetch_financial_data')
+    def test_get_excel_symbol_stripped(self, mock_fetch_data, mock_fetch_info, client):
+        """Test that symbol whitespace is stripped before processing."""
+        mock_fetch_data.return_value = pd.DataFrame({
+            'Year': ['2023-12-31'],
+            'Total Revenue (mn)': [100000.0],
+            'Net Income Common Stockholders (mn)': [20000.0],
+            'Free Cash Flow (mn)': [15000.0],
+            'Dividend per Share': [None],
+            'Ordinary Shares Number (mn)': [1000.0],
+            'Stockholders Equity (mn)': [50000.0],
+            'Total Assets (mn)': [200000.0],
+            'Goodwill (mn)': [0.0],
+            'Other Intangible Assets (mn)': [0.0],
+        })
+        mock_fetch_info.return_value = {
+            'name': 'Test Corp', 'sector': 'Tech', 'currency': 'USD', 'current_price': 50.0
+        }
+
+        response = client.get('/market/excel?symbol= AAPL ')
+
+        assert response.status_code == 200
+        mock_fetch_data.assert_called_once_with('AAPL')
+
+    @patch('fill_excel_template.fetch_company_info')
+    @patch('fill_excel_template.fetch_financial_data')
+    def test_get_excel_filename_uses_safe_ticker(self, mock_fetch_data, mock_fetch_info, client):
+        """Test that dots in ticker symbol are replaced with underscores in filename."""
+        mock_fetch_data.return_value = pd.DataFrame({
+            'Year': ['2023-12-31'],
+            'Total Revenue (mn)': [100000.0],
+            'Net Income Common Stockholders (mn)': [20000.0],
+            'Free Cash Flow (mn)': [15000.0],
+            'Dividend per Share': [None],
+            'Ordinary Shares Number (mn)': [1000.0],
+            'Stockholders Equity (mn)': [50000.0],
+            'Total Assets (mn)': [200000.0],
+            'Goodwill (mn)': [0.0],
+            'Other Intangible Assets (mn)': [0.0],
+        })
+        mock_fetch_info.return_value = {
+            'name': 'SAP SE', 'sector': 'Technology', 'currency': 'EUR', 'current_price': 200.0
+        }
+
+        response = client.get('/market/excel?symbol=SAP.DE')
+
+        assert response.status_code == 200
+        disposition = response.headers.get('Content-Disposition', '')
+        assert 'SAP_DE' in disposition
+        assert 'SAP.DE' not in disposition  # dots in ticker must be replaced
+
+
+@pytest.mark.integration
+class TestExcelIntegration:
+    """Integration tests for /market/excel endpoint with real yfinance calls."""
+
+    def test_get_excel_real_symbol(self, client):
+        """Test generating a real Excel file for AAPL."""
+        response = client.get('/market/excel?symbol=AAPL')
+
+        assert response.status_code == 200
+        assert response.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        assert len(response.data) > 5000  # Expect a non-trivial xlsx file
+
+    def test_get_excel_real_international_symbol(self, client):
+        """Test generating a real Excel file for an international ticker (ALV.DE)."""
+        response = client.get('/market/excel?symbol=ALV.DE')
+
+        assert response.status_code == 200
+        assert response.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        disposition = response.headers.get('Content-Disposition', '')
+        assert 'ALV_DE' in disposition
 
 
 
