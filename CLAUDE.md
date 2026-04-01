@@ -65,6 +65,12 @@ python src/fill_excel_template.py SAP.DE output.xlsx
 
 **Entry point:** `src/wsgi.py` imports the Flask app for Gunicorn.
 
+## API Documentation
+
+Whenever a new endpoint is added or an existing one is changed, examples must be updated in **both**:
+- `market-server.http` — JetBrains HTTP Client / VS Code REST Client format
+- `API.md` — Markdown with clickable links
+
 ## Key Patterns
 
 - **German localization**: Numbers formatted as `1.234.567,89` in TSV output
