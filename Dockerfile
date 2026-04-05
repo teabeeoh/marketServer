@@ -9,10 +9,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY src/*.py .
-COPY requirements-dev.txt ./
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir flask yfinance gunicorn anthropic
+COPY src/*.py .
+COPY resources/excel_template.xlsx /resources/excel_template.xlsx
 
 # Umgebungsvariable ANTHROPIC_API_KEY beim Starten des Containers vom Host übernehmen:
 # Beispiel: docker run -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY ...
