@@ -11,10 +11,10 @@ Python 3.11 Flask REST API server for financial market data, fetching stock quot
 ### Run Server
 ```bash
 # Development
-python -m flask run
+uv run flask run
 
 # Production (Gunicorn)
-gunicorn -c src/gunicorn.conf.py wsgi:app
+uv run gunicorn -c src/gunicorn.conf.py wsgi:app
 
 # Docker
 docker build . --tag marketserver:latest
@@ -23,22 +23,22 @@ docker run -p 9000:9000 marketserver:latest
 
 ### Install Dependencies
 ```bash
-pip install flask yfinance gunicorn anthropic
-pip install -r requirements-dev.txt  # adds pytest, pytest-cov, openpyxl
+uv sync              # runtime + dev dependencies from pyproject.toml / uv.lock
+uv sync --no-dev     # runtime dependencies only
 ```
 
 ### Run Tests
 ```bash
-pytest tests/ -v -m "not integration"  # unit tests only (fast, mocked)
-pytest tests/ -v -m integration          # integration tests (real API calls)
-pytest tests/ -v                          # all tests
-pytest tests/ --cov=src --cov-report=html # with coverage
+uv run pytest tests/ -v -m "not integration"  # unit tests only (fast, mocked)
+uv run pytest tests/ -v -m integration         # integration tests (real API calls)
+uv run pytest tests/ -v                         # all tests
+uv run pytest tests/ --cov=src --cov-report=html # with coverage
 ```
 
 ### Excel Template Filler
 ```bash
-python src/fill_excel_template.py AAPL
-python src/fill_excel_template.py SAP.DE output.xlsx
+uv run python src/fill_excel_template.py AAPL
+uv run python src/fill_excel_template.py SAP.DE output.xlsx
 ```
 
 ## Architecture
@@ -76,4 +76,4 @@ Whenever a new endpoint is added or an existing one is changed, examples must be
 - **German localization**: Numbers formatted as `1.234.567,89` in TSV output
 - **Flexible yfinance field mapping**: Tries multiple field name variants to handle API inconsistencies
 - **Test isolation**: Unit tests mock yfinance entirely; integration tests (marked `@pytest.mark.integration`) make real API calls
-- **pytest markers** configured in `pytest.ini` (project root)
+- **pytest markers** configured under `[tool.pytest.ini_options]` in `pyproject.toml`

@@ -122,22 +122,22 @@ The test suite includes both **unit tests** (with mocked yfinance calls) and **i
 
 ```bash
 # Install development dependencies
-pip install -r requirements-dev.txt
+uv sync
 
 # Run all tests (unit + integration)
-pytest test_market_server.py -v
+uv run pytest tests/ -v
 
 # Run only unit tests (fast, no real API calls)
-pytest test_market_server.py -v -m "not integration"
+uv run pytest tests/ -v -m "not integration"
 
 # Run only integration tests (slower, makes real yfinance API calls)
-pytest test_market_server.py -v -m integration
+uv run pytest tests/ -v -m integration
 
 # Run tests with coverage
-pytest test_market_server.py --cov=market_server --cov-report=html
+uv run pytest tests/ --cov=src --cov-report=html
 
 # Run tests with coverage (unit tests only)
-pytest test_market_server.py -m "not integration" --cov=market_server --cov-report=html
+uv run pytest tests/ -m "not integration" --cov=src --cov-report=html
 ````
 
 ### Test Suite Overview
@@ -248,8 +248,10 @@ The script maps the following financial data to Excel columns:
 
 ### Requirements
 
+All runtime dependencies (including `openpyxl`, `pandas`, and `yfinance`) are declared in `pyproject.toml`. Install them with:
+
 ```bash
-pip install openpyxl pandas yfinance
+uv sync
 ```
 
 
