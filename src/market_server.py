@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 from flask import Flask, request, jsonify, Response, send_file
 import yfinance as yf
@@ -13,6 +14,20 @@ sys.path.insert(0, str(Path(__file__).parent))
 from fill_excel_template import fill_excel_template
 
 TEMPLATE_PATH = Path(__file__).parent.parent / 'resources' / 'excel_template.xlsx'
+
+
+def _read_version() -> str:
+    """Read the project version from pyproject.toml by walking up from this file."""
+    start = Path(__file__).resolve().parent
+    for candidate in (start, *start.parents):
+        pyproject = candidate / "pyproject.toml"
+        if pyproject.is_file():
+            return tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+    return "unknown"
+
+
+VERSION = _read_version()
+print(f"Starting market-server version {VERSION}")
 
 app = Flask(__name__)
 
