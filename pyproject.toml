@@ -3,7 +3,7 @@ name = "market-server"
 version = "0.1.0"
 description = "Flask REST API server for financial market data and AI-powered investment analyses"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 authors = [{ name = "Thomas Bolz", email = "thomas.bolz@gmail.com" }]
 dependencies = [
     "flask>=3.0.0",
@@ -11,6 +11,7 @@ dependencies = [
     "gunicorn>=22.0.0",
     "anthropic>=0.40.0",
     "openpyxl>=3.0.0",
+    "claude-agent-sdk>=0.2.87",
 ]
 
 [dependency-groups]

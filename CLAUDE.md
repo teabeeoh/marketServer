@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Python 3.11 Flask REST API server for financial market data, fetching stock quotes and financial statements from Yahoo Finance via the `yfinance` library, and AI-powered investment analyses via the Anthropic Claude API. Deployed with Gunicorn in Docker, served on port 9000.
+Python 3.14 Flask REST API server for financial market data, fetching stock quotes and financial statements from Yahoo Finance via the `yfinance` library, and AI-powered investment analyses via the Anthropic Claude API. Deployed with Gunicorn in Docker, served on port 9000.
 
 ## Commands
 

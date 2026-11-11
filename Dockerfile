@@ -1,5 +1,5 @@
 # Dockerfile
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 LABEL org.label-schema.schema-version="1.0"
 LABEL maintainer="Thomas Bolz <thomas.bolz@gmail.com>"
