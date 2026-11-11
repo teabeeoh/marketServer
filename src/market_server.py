@@ -53,10 +53,9 @@ def get_quotes():
     for symbol in symbol_list:
         try:
             info = tickers.tickers[symbol].info
-            # log result to console
-            print(f"{symbol}: {info}")
             price = info.get("currentPrice")
             currency = info.get("currency")
+            print(f"{symbol}: {price} {currency}")
             result[symbol] = {
                 "price": price,
                 "currency": currency
